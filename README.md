@@ -1,6 +1,6 @@
 # Škálování e-commerce platformy pomocí logické replikace v PostgreSQL
 
-Tento repozitář obsahuje praktickou implementaci k diplomové práci obhájené na **Univerzitě Hradec Králové (UHK), Fakultě informatiky a managementu**.
+Tento repozitář obsahuje praktickou implementaci k diplomové práci na **Univerzitě Hradec Králové (UHK), Fakultě informatiky a managementu**.
 
 **Autor:** Bc. Lukáš Kovář  
 **Téma práce:** Škálování e-commerce platformy pomocí logické replikace v PostgreSQL
