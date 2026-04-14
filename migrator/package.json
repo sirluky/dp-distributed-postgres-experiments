@@ -1,0 +1,24 @@
+{
+  "name": "migrator",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "setup": "bun install",
+    "build": "tsc -p .",
+    "test": "bun test",
+    "lint": "echo \"No linter configured. Add eslint/prettier as needed.\" && exit 0",
+    "migration:new": "bun run src/create-migration.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.16.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "pg": "^8.17.2",
+    "umzug": "^3.8.2"
+  }
+}

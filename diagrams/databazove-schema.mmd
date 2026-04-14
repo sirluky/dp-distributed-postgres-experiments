@@ -1,0 +1,75 @@
+erDiagram
+    core_merchants {
+        int id PK
+        varchar name
+        decimal commission_rate
+    }
+    core_products {
+        int id PK
+        int merchant_id FK
+        varchar name
+        decimal price
+        boolean is_scarcity_mode
+    }
+    core_inventory_ledger {
+        int product_id PK
+        int total_physical_stock
+        int leased_to_edges
+    }
+    core_stock_grants {
+        uuid id PK
+        uuid request_id FK
+        varchar replication_identity
+        int product_id FK
+        int granted_qty
+        timestamp created_at
+    }
+    edge_orders {
+        uuid id PK
+        int user_id
+        varchar replication_identity
+        decimal total_price
+        varchar status
+        timestamp created_at
+    }
+    edge_order_items {
+        uuid id PK
+        uuid order_id FK
+        int product_id FK
+        int quantity
+        decimal price
+    }
+    edge_stock_requests {
+        uuid id PK
+        varchar replication_identity
+        int product_id FK
+        int requested_qty
+        varchar status
+        timestamp created_at
+    }
+    local_carts {
+        uuid id PK
+        varchar session_id
+        timestamp created_at
+    }
+    local_cart_items {
+        int id PK
+        uuid cart_id FK
+        int product_id FK
+        int quantity
+    }
+    local_inventory_quota {
+        int product_id PK
+        int quantity
+        timestamp last_updated
+    }
+
+    core_merchants ||--o{ core_products : "vlastní"
+    core_products ||--o| core_inventory_ledger : "má sklad"
+    core_products ||--o{ core_stock_grants : "přiděluje zásoby"
+    core_products ||--o{ edge_stock_requests : "žádá zásoby"
+    core_products ||--o{ edge_order_items : "obsažen v"
+    core_products ||--o{ local_cart_items : "v košíku"
+    core_stock_grants }o--|| edge_stock_requests : "plní žádost"
+    edge_orders ||--o{ edge_order_items : "zahrnuje"
+    local_carts ||--o{ local_cart_items : "obsahuje"

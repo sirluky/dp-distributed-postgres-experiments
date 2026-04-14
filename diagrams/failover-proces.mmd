@@ -1,0 +1,26 @@
+flowchart TD
+    subgraph before["Stav před failoverem"]
+        direction TB
+        P1["🟢 Core (PRIMARY)"] -- "streaming<br/>replication" --> S1["🔵 Core Replica (STANDBY)"]
+        P1 -- "logická replikace<br/>(pub/sub)" --> E1["Edge 1, 2, 3"]
+        E1 -- "logická replikace<br/>(pub/sub)" --> P1
+    end
+
+    before -- "❌ Výpadek Core" --> failover
+
+    subgraph failover["Proces failoveru"]
+        direction TB
+        F1["1. Ověření nedostupnosti<br/>primárního serveru"] --> F2["2. Promoce standby<br/>(pg_promote)"]
+        F2 --> F3["3. Vytvoření publikací<br/>na novém primary"]
+        F3 --> F4["4. Přesměrování edge<br/>subscriptions"]
+        F4 --> F5["5. Vytvoření nových<br/>subscriptions z edges"]
+    end
+
+    failover --> after
+
+    subgraph after["Stav po failoveru"]
+        direction TB
+        P2["❌ Core (DOWN)"]
+        S2["🟢 Core Replica (NOVÝ PRIMARY)"] -- "logická replikace" --> E2["Edge 1, 2, 3"]
+        E2 -- "logická replikace" --> S2
+    end

@@ -1,0 +1,37 @@
+node_modules/
+
+# Local assistant / machine-specific state
+.claude/
+
+# Generated dependencies and build outputs
+**/node_modules/
+**/target/
+**/dist/
+**/out/
+**/coverage/
+**/*.tsbuildinfo
+**/*.log
+**/*.trace
+**/*.zip
+**/*.tar.gz
+**/*.tgz
+**/*.bun
+**/package-lock.json
+
+# K6 benchmark results
+experiments/k6/results/*
+
+# OpenResty logs
+nginx/*.log
+
+# Scratch / archive area
+/_kos/
+
+# Ad-hoc local config draft
+openresty_v_praxi.conf
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

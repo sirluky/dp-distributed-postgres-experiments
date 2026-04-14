@@ -1,0 +1,403 @@
+{
+  "id": null,
+  "uid": "pg-overview",
+  "title": "PostgreSQL Overview",
+  "tags": ["postgres", "database", "replication", "performance"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(pg_up, instance)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "datname",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(pg_database_size_bytes{instance=~\"$instance\"}, datname)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Exporter Up",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "min(pg_up{instance=~\"$instance\"})",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Scrape Errors",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(pg_exporter_last_scrape_error{instance=~\"$instance\"})",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Current Connections",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(activity_connections_summary_total{instance=~\"$instance\", datname=~\"$datname\"})",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Connection Utilization (%)",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(activity_connections_summary_total{instance=~\"$instance\", datname=~\"$datname\"}) / clamp_min(sum(db_connection_limits_max_connections{instance=~\"$instance\", datname=~\"$datname\"}), 1)",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "WAL Retained Total (MB)",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(wal_replication_slot_wal_retained_bytes{instance=~\"$instance\"} / 1024 / 1024)",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Database Size (MB) by DB",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "pg_database_size_bytes{instance=~\"$instance\", datname=~\"$datname\"} / 1024 / 1024",
+          "legendFormat": "{{instance}} / {{datname}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Connections by State (pg_stat_activity)",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "activity_connections_by_state_connections{instance=~\"$instance\", datname=~\"$datname\"}",
+          "legendFormat": "{{instance}} / {{datname}} / {{state}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "WAL Retained per Slot (MB)",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "wal_replication_slot_wal_retained_bytes{instance=~\"$instance\"} / 1024 / 1024",
+          "legendFormat": "{{instance}} / {{slot_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "WAL Unflushed per Slot (MB)",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "wal_replication_slot_wal_unflushed_bytes{instance=~\"$instance\"} / 1024 / 1024",
+          "legendFormat": "{{instance}} / {{slot_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Transactions per Second (TPS)",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 20
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, datname) (rate(pg_stat_database_xact_commit{instance=~\"$instance\", datname=~\"$datname\"}[5m]) + rate(pg_stat_database_xact_rollback{instance=~\"$instance\", datname=~\"$datname\"}[5m]))",
+          "legendFormat": "{{instance}} / {{datname}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Cache Hit Ratio (%)",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 20
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * sum by (instance, datname) (rate(pg_stat_database_blks_hit{instance=~\"$instance\", datname=~\"$datname\"}[5m])) / clamp_min(sum by (instance, datname) (rate(pg_stat_database_blks_hit{instance=~\"$instance\", datname=~\"$datname\"}[5m]) + rate(pg_stat_database_blks_read{instance=~\"$instance\", datname=~\"$datname\"}[5m])), 1)",
+          "legendFormat": "{{instance}} / {{datname}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Deadlocks (rate/min)",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 20
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "60 * sum by (instance, datname) (rate(pg_stat_database_deadlocks{instance=~\"$instance\", datname=~\"$datname\"}[5m]))",
+          "legendFormat": "{{instance}} / {{datname}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Temp Bytes per Second",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, datname) (rate(pg_stat_database_temp_bytes{instance=~\"$instance\", datname=~\"$datname\"}[5m]))",
+          "legendFormat": "{{instance}} / {{datname}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Locks Count",
+      "datasource": "Prometheus",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, datname, mode) (pg_locks_count{instance=~\"$instance\", datname=~\"$datname\"})",
+          "legendFormat": "{{instance}} / {{datname}} / {{mode}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

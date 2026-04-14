@@ -1,0 +1,45 @@
+flowchart TD
+    classDef actor fill:#f3f4f6,stroke:#374151,stroke-width:2px
+    classDef core fill:#eff6ff,stroke:#2563eb,stroke-width:2px
+    classDef edge fill:#f0fdf4,stroke:#16a34a,stroke-width:2px
+    classDef ext fill:#fef3c7,stroke:#d97706,stroke-width:2px
+    classDef batch fill:#fef2f2,stroke:#dc2626,stroke-width:2px
+
+    subgraph Uzivatele["👥 Aktéři a procesy"]
+        direction TB
+        M([Obchodník]):::actor
+        Z([Zákazník]):::actor
+        
+        M_Process(Správa produktů<br/>a skladových zásob)
+        Z_Process(Prohlížení katalogu<br/>a vytvoření objednávky)
+        
+        M --> M_Process
+        Z --> Z_Process
+    end
+
+    subgraph Databazova_Vrstva["🗄️ Databázová infrastruktura (PostgreSQL 18)"]
+        direction LR
+        CORE[(Core DB<br/>Centrála)]:::core
+        EDGE[(Edge DB<br/>Regionální uzel)]:::edge
+        
+        CORE -- "1. Logická replikace (Katalog)<br/>pub_core_to_edges" --> EDGE
+        EDGE -- "2. Logická replikace (Objednávky)<br/>pub_edge_to_core" --> CORE
+        CORE -. "3. Zpětná propagace stavů<br/>pub_core_to_edges" .-> EDGE
+    end
+
+    subgraph Externi_Systemy["📡 Externí systémy a zpracování"]
+        direction TB
+        CRON[[Dávkové zpracování<br/>(Denní job)]]:::batch
+        LOGISTIKA{{Logistický poskytovatel<br/>(API Provider)}}:::ext
+        
+        CRON -->|Dotaz na stav doručení| LOGISTIKA
+        LOGISTIKA -->|Objemný datový report| CRON
+    end
+
+    %% Vazby mezi vrstvami
+    M_Process -->|Zápis do core_products| CORE
+    Z_Process -->|Čtení katalogu| EDGE
+    Z_Process -->|Zápis do edge_orders| EDGE
+    
+    CRON -->|Hromadný UPDATE stavů| CORE
+

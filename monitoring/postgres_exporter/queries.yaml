@@ -1,0 +1,92 @@
+wal_replication_slot:
+  query: |
+    SELECT
+      slot_name,
+      plugin,
+      slot_type,
+      active::text AS active,
+      pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)::double precision AS wal_retained_bytes,
+      COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn), 0)::double precision AS wal_unflushed_bytes
+    FROM pg_replication_slots
+    WHERE slot_type = 'logical';
+  metrics:
+    - slot_name:
+        usage: "LABEL"
+        description: "Replication slot name"
+    - plugin:
+        usage: "LABEL"
+        description: "Logical replication plugin"
+    - slot_type:
+        usage: "LABEL"
+        description: "Replication slot type"
+    - active:
+        usage: "LABEL"
+        description: "Whether slot is active"
+    - wal_retained_bytes:
+        usage: "GAUGE"
+        description: "WAL retained size in bytes from current LSN to restart_lsn"
+    - wal_unflushed_bytes:
+        usage: "GAUGE"
+        description: "WAL unflushed size in bytes from current LSN to confirmed_flush_lsn"
+
+activity_connections_by_state:
+  query: |
+    SELECT
+      current_database() AS datname,
+      COALESCE(state, 'unknown') AS state,
+      COUNT(*)::double precision AS connections
+    FROM pg_stat_activity
+    GROUP BY current_database(), COALESCE(state, 'unknown');
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Database name"
+    - state:
+        usage: "LABEL"
+        description: "Connection state from pg_stat_activity"
+    - connections:
+        usage: "GAUGE"
+        description: "Number of connections grouped by state"
+
+activity_connections_summary:
+  query: |
+    SELECT
+      current_database() AS datname,
+      COUNT(*)::double precision AS total,
+      SUM((state = 'active')::int)::double precision AS active,
+      SUM((state = 'idle')::int)::double precision AS idle,
+      SUM((state = 'idle in transaction')::int)::double precision AS idle_in_transaction
+    FROM pg_stat_activity;
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Database name"
+    - total:
+        usage: "GAUGE"
+        description: "Total number of connections"
+    - active:
+        usage: "GAUGE"
+        description: "Number of active connections"
+    - idle:
+        usage: "GAUGE"
+        description: "Number of idle connections"
+    - idle_in_transaction:
+        usage: "GAUGE"
+        description: "Number of idle in transaction connections"
+
+db_connection_limits:
+  query: |
+    SELECT
+      current_database() AS datname,
+      current_setting('max_connections')::double precision AS max_connections,
+      current_setting('superuser_reserved_connections')::double precision AS superuser_reserved_connections
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Database name"
+    - max_connections:
+        usage: "GAUGE"
+        description: "Configured max_connections"
+    - superuser_reserved_connections:
+        usage: "GAUGE"
+        description: "Configured superuser_reserved_connections"

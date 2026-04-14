@@ -1,0 +1,58 @@
+flowchart LR
+    Customer(["👤 Zákazník"])
+    Merchant(["👔 Obchodník / Admin"])
+    PayGW(["💳 Platební brána"])
+
+    subgraph EDGE ["🖥️  Edge uzel  (role: edge)"]
+        direction TB
+        P1(["Procházet produkty"])
+        P2(["Detail produktu"])
+        C1(["Vytvořit košík"])
+        C2(["Zobrazit košík"])
+        C3(["Přidat položku do košíku"])
+        C4(["Odebrat položku z košíku"])
+        O1(["Vytvořit objednávku"])
+        O2(["Detail objednávky"])
+        O3(["Změnit adresu objednávky"])
+    end
+
+    subgraph CORE ["🏢  Core uzel  (role: core)"]
+        direction TB
+        P3(["Procházet produkty"])
+        P4(["Detail produktu"])
+        M1(["Výpis obchodníků"])
+        M2(["Registrovat obchodníka"])
+        M3(["Přidat produkt obchodníkovi"])
+        M4(["Objednávky obchodníka"])
+        M5(["Změnit provizi"])
+        S1(["Denní vyúčtování (batch)"])
+        S2(["Detail vyúčtování"])
+        A1(["Analytika objednávek"])
+    end
+
+    subgraph WH ["🔔  Webhooks"]
+        W1(["Potvrzení platby"])
+    end
+
+    Customer --> P1
+    Customer --> P2
+    Customer --> C1
+    Customer --> C2
+    Customer --> C3
+    Customer --> C4
+    Customer --> O1
+    Customer --> O2
+    Customer --> O3
+
+    Merchant --> P3
+    Merchant --> P4
+    Merchant --> M1
+    Merchant --> M2
+    Merchant --> M3
+    Merchant --> M4
+    Merchant --> M5
+    Merchant --> S1
+    Merchant --> S2
+    Merchant --> A1
+
+    PayGW --> W1

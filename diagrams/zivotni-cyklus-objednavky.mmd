@@ -1,0 +1,35 @@
+sequenceDiagram
+    autonumber
+    actor M as Obchodník
+    actor Z as Zákazník
+    participant C as Core DB
+    participant E as Edge DB
+    participant Batch as Dávkové zpracování
+    participant API as Externí logistika
+
+    rect rgb(238, 250, 255)
+    note right of M: Fáze 1: Konfigurace & Katalog
+    M->>C: Vykreslí profil, přidá produkt (core_products)
+    M->>C: Zadá skladové zásoby (core_stock_grants)
+    C-->>E: [Logická replikace] Propagace katalogu (pub_core_to_edges)
+    end
+
+    rect rgb(240, 253, 244)
+    note right of Z: Fáze 2: Nákup na regionálním uzlu
+    Z->>E: Návštěva tržiště, zobrazení produktu (Read-only tabulky)
+    Z->>E: Přidá do košíku & Dokončí objednávku
+    note over E: Zápis do `edge_orders` a `edge_order_items`<br/>Lokální blokace skladových zásob
+    E-->>C: [Logická replikace] Přenos objednávky (pub_edge_to_core)
+    end
+    
+    rect rgb(254, 252, 232)
+    note right of Batch: Fáze 3: Dávkové zpracování logistiky
+    Batch->>API: ⏱️ Denní job: Vyžádání stavu doručených zásilek (HTTP GET)
+    API-->>Batch: Objemný report změn (JSON/CSV)
+    Batch->>Batch: Validace přijatých dat reportu
+    Batch->>C: Hromadný UPDATE `edge_orders.status` (nastavení na 'Doručeno')
+    C-->>E: [Logická replikace] Zpětná propagace updatovaných obálek
+    end
+    
+    Z->>E: Zákazník si zkontroluje detail objednávky
+    E-->>Z: Vidí aktuální stav: DORUČENO

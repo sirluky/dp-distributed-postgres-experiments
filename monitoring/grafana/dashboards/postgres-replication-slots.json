@@ -1,0 +1,68 @@
+{
+  "id": null,
+  "uid": "pg-repl-slots",
+  "title": "PostgreSQL Replication Slots",
+  "tags": ["postgres", "replication", "wal"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "WAL Retained Size (MB)",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "wal_replication_slot_wal_retained_bytes / 1024 / 1024",
+          "legendFormat": "{{instance}} / {{slot_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "WAL Unflushed Size (MB)",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "wal_replication_slot_wal_unflushed_bytes / 1024 / 1024",
+          "legendFormat": "{{instance}} / {{slot_name}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
+}

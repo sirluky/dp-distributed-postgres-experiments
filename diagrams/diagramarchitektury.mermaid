@@ -1,0 +1,43 @@
+---
+config:
+  layout: elk
+---
+
+flowchart TB
+ subgraph LB_Logic["Logika Load Balanceru"]
+        Select["Výběr uzlu s nejmenším množství aktivních připojení"]
+        LB_Decision{"Load Balancer"}
+ end
+
+ subgraph Edge_Layer["Edge Vrstva - Zákaznický provoz"]
+    direction TB
+        Edge1["Edge Server 1"]
+        Edge2["Edge Server 2"]
+        Edge3["Edge Server 3"]
+        DB1[("Edge DB 1")]
+        DB2[("Edge DB 2")]
+        DB3[("Edge DB 3")]
+ end
+
+ subgraph Analytika a konfigurace
+    direction TB
+        CoreApp["Core Aplikační Server"]
+        CoreDB[("Centrální CORE Databáze")]
+ end
+
+    User(["Uživatel / Klient"]) --> LB_Decision
+    LB_Decision -- "1. Nový uživatel" --> Select
+    
+    Select --> Edge1 & Edge2 & Edge3
+    
+    %% Upravená tučnost čáry u App Serveru (nyní standardní šipka)
+    Select --> CoreApp
+    CoreApp --> CoreDB
+
+    Edge1 --- DB1
+    Edge2 --- DB2
+    Edge3 --- DB3
+    
+    DB1 <== Logická replikace ==> CoreDB
+    DB2 <== Logická replikace ==> CoreDB
+    DB3 <== Logická replikace ==> CoreDB

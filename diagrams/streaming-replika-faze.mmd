@@ -1,0 +1,7 @@
+flowchart TD
+    A["1. Konfigurace primárního serveru"] --> B["2. Inicializace repliky<br/>(pg_basebackup)"]
+    B --> C["3. Spuštění repliky<br/>v režimu hot standby"]
+    C --> D{"Replika běží"}
+    D --> E["Průběžný příjem<br/>WAL záznamů"]
+    D --> F["Obsluha čtecích<br/>dotazů"]
+    D --> G["Synchronizace<br/>failover slotů"]

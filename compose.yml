@@ -1,0 +1,457 @@
+services:
+  db_core:
+    image: postgres:18
+    cpus: "1.0"
+    mem_limit: 4g
+    cpuset: "0-1"
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - max_connections=1024
+      - -c
+      - max_wal_senders=10
+      - -c
+      - wal_keep_size=1GB
+      - -c
+      - max_replication_slots=20
+    ports:
+      - 35432:5432
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_HOST_AUTH_METHOD=md5
+    volumes:
+      - ./migrations/00_init_core.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+      - ./migrations/01_enable_replication.sh:/docker-entrypoint-initdb.d/01_enable_replication.sh:ro
+      - core_data:/var/lib/postgresql
+
+  db_core_replica:
+    image: postgres:18
+    user: postgres
+    cpus: "2.0"
+    mem_limit: 2g
+    cpuset: "8-9"
+    ports:
+      - 35436:5432
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - PGUSER=admin
+      - PGPASSWORD=admin
+    volumes:
+      - core_replica_data:/var/lib/postgresql
+    command:
+      - bash
+      - -c
+      - |
+        # Wait for primary to be ready
+        until pg_isready -h db_core -p 5432 -U admin; do
+          echo "Waiting for primary..."
+          sleep 2
+        done
+
+        # Data directory
+        DATA_DIR="/var/lib/postgresql/data"
+
+        # Check if data directory is empty (first run)
+        if [ ! -s "$$DATA_DIR/PG_VERSION" ]; then
+          echo "Initializing replica from primary..."
+          rm -rf $$DATA_DIR/*
+          mkdir -p $$DATA_DIR
+          chmod 700 $$DATA_DIR
+          pg_basebackup -h db_core -p 5432 -U admin -D $$DATA_DIR -Fp -Xs -P -R
+          chmod 700 $$DATA_DIR
+          
+          # Update primary_conninfo to include dbname for slot sync (PG18 requirement)
+          sed -i "s/primary_conninfo = '\\(.*\\)'/primary_conninfo = '\\1 dbname=postgres'/" $$DATA_DIR/postgresql.auto.conf
+        fi
+
+        # Start postgres in replica mode with PG17/18 slot sync support
+        # - hot_standby=on: allow read queries on standby
+        # - hot_standby_feedback=on: prevent vacuum from removing rows needed by standby
+        # - primary_slot_name: use named slot for streaming (enables slot sync)
+        # - sync_replication_slots=on: enable automatic slot synchronization (PG18)
+        # - wal_level=logical: required for logical slot synchronization
+        exec postgres \
+          -c hot_standby=on \
+          -c max_connections=1024 \
+          -c hot_standby_feedback=on \
+          -c primary_slot_name=replica_slot \
+          -c sync_replication_slots=on \
+          -c wal_level=logical \
+          -c shared_preload_libraries=pg_stat_statements \
+          -D $$DATA_DIR
+    depends_on:
+      - db_core
+
+  db_edge1:
+    image: postgres:18
+    cpus: "1.0"
+    mem_limit: 768m
+    cpuset: "10-11"
+    ports:
+      - 35433:5432
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    volumes:
+      - edge1_data:/var/lib/postgresql
+      - ./migrations/00_init_edge1.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+
+  # … stejna konfigurace pro edge2 a edge3
+
+
+  db_edge2:
+    image: postgres:18
+    cpus: "1.0"
+    mem_limit: 768m
+    cpuset: "12-13"
+    ports:
+      - 35434:5432
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    volumes:
+      - edge2_data:/var/lib/postgresql
+      - ./migrations/00_init_edge2.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+
+  db_edge3:
+    image: postgres:18
+    cpus: "1.0"
+    mem_limit: 768m
+    cpuset: "14-15"
+    ports:
+      - 35435:5432
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    volumes:
+      - edge3_data:/var/lib/postgresql
+      - ./migrations/00_init_edge3.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+
+  migrator:
+    build:
+      context: ./migrator
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    volumes:
+      - ./migrator/src:/app/src:ro
+      - ./migrations:/app/migrations:ro
+    depends_on:
+      - db_core
+      - db_edge1
+      - db_edge2
+      - db_edge3
+    restart: "no"
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   ports:
+  #     - 38080:80
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@admin.com
+  #     PGADMIN_DEFAULT_PASSWORD: lukas
+  #     PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+  #     PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
+  #     PGPASS_FILE: /tmp/pgpass/pgpassfile
+  #   volumes:
+  #     - pgadmin_data:/var/lib/pgadmin
+  #     - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+  #     - ./pgadmin/pgpass:/tmp/pgpass:ro
+  #   depends_on:
+  #     - core
+  #     - edge1
+  #     - edge2
+
+  # cloudbeaver:
+  #   image: dbeaver/cloudbeaver:latest
+  #   ports:
+  #     - 38978:8978
+  #   environment:
+  #     - CB_ADMIN_NAME=admin
+  #     - CB_ADMIN_PASSWORD=admin
+  #     - CB_SERVER_NAME=CloudBeaver
+  #   volumes:
+  #     - cloudbeaver_data:/opt/cloudbeaver/workspace
+  #   depends_on:
+  #     - core
+  #     - edge1
+  #     - edge2
+  #   restart: unless-stopped
+
+  # migrator:
+  #   build:
+  #     context: ./tools/migrator
+  #   environment:
+  #     - PGUSER=admin
+  #     - PGPASSWORD=admin
+  #     - PGDATABASE=postgres
+  #   volumes:
+  #     - ./goose:/goose
+  #   depends_on:
+  #     - core
+  #     - edge1
+  #     - edge2
+  #   restart: "no"
+  # bash:
+  #   image: postgres:18
+  #   environment:
+  #     - PGUSER=admin
+  #     - PGPASSWORD=admin
+  #     - PGDATABASE=postgres
+  #   volumes:
+  #     - ./tools/migrator:/work
+  #   entrypoint: [ "tail", "-f", "/dev/null" ]
+  #   depends_on:
+  #     - core
+  #     - edge1
+  #     - edge2
+  #   restart: "no"
+
+  # =============================================================================
+  # Application Services (Elysia API servers)
+  # =============================================================================
+
+  # Core API server - handles traffic like edge + core-specific operations (merchants, analytics, settlements)
+  app_core:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ROLE=all
+      - EDGE_ID=core
+      - DB_HOST=db_core
+      - DB_PORT=5432
+      - DB_NAME=core_db
+      - DB_USER=admin
+      - DB_PASSWORD=admin
+      - PORT=3000
+    ports:
+      - "3001:3000"
+    depends_on:
+      - db_core
+      - migrator
+    restart: unless-stopped
+
+  # Edge 1 API server - handles edge-specific operations (cart, orders, products)
+  app_edge1:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ROLE=edge
+      - EDGE_ID=edge1
+      - DB_HOST=db_edge1
+      - DB_PORT=5432
+      - DB_NAME=edge1_db
+      - DB_USER=admin
+      - DB_PASSWORD=admin
+      - PORT=3000
+    ports:
+      - "3002:3000"
+    depends_on:
+      - db_edge1
+      - migrator
+    restart: unless-stopped
+
+  # Edge 2 API server
+  app_edge2:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ROLE=edge
+      - EDGE_ID=edge2
+      - DB_HOST=db_edge2
+      - DB_PORT=5432
+      - DB_NAME=edge2_db
+      - DB_USER=admin
+      - DB_PASSWORD=admin
+      - PORT=3000
+    depends_on:
+      - db_edge2
+      - migrator
+    restart: unless-stopped
+
+  # Edge 3 API server
+  app_edge3:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ROLE=edge
+      - EDGE_ID=edge3
+      - DB_HOST=db_edge3
+      - DB_PORT=5432
+      - DB_NAME=edge3_db
+      - DB_USER=admin
+      - DB_PASSWORD=admin
+      - PORT=3000
+    depends_on:
+      - db_edge3
+      - migrator
+    restart: unless-stopped
+
+  # =============================================================================
+  # Load Balancer (OpenResty)
+  # =============================================================================
+
+  # OpenResty load balancer with sticky sessions
+  lb:
+    image: openresty/openresty:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/openresty.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+    depends_on:
+      - app_core
+      - app_edge1
+      - app_edge2
+      - app_edge3
+    restart: unless-stopped
+
+  # =============================================================================
+  # K6 Benchmarking Service
+  # =============================================================================
+
+  # K6 load testing tool for performance benchmarks
+  k6:
+    image: grafana/k6:latest
+    ports:
+      - "5665:5665"
+    volumes:
+      - ./experiments/k6:/scripts:ro
+      - ./experiments/k6/results:/results:rw
+      - ./benchmark:/benchmark:ro
+      - ./benchmark/results:/benchmark-results:rw
+    environment:
+      - K6_WEB_DASHBOARD=true
+      - K6_WEB_DASHBOARD_EXPORT=/benchmark-results/k6-web-dashboard-report.html
+      - K6_OUT_EXPERIMENTAL_PUSH=experimental-prometheus-rw
+    depends_on:
+      - lb
+      - app_core
+    restart: "no"
+
+  # =============================================================================
+  # Monitoring Stack (Prometheus + Grafana + PostgreSQL Exporters)
+  # =============================================================================
+
+  postgres_exporter_core:
+    image: prometheuscommunity/postgres-exporter:latest
+    volumes:
+      - ./monitoring/postgres_exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    environment:
+      - DATA_SOURCE_URI=db_core:5432/core_db?sslmode=disable
+      - DATA_SOURCE_USER=admin
+      - DATA_SOURCE_PASS=admin
+      - PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres_exporter/queries.yaml
+    depends_on:
+      - db_core
+    restart: unless-stopped
+
+  # stejným způsobem postgres_exporter_edge1, edge2, edge3 s příslušnými DB hosty a názvy databází
+  postgres_exporter_edge1:
+    image: prometheuscommunity/postgres-exporter:latest
+    volumes:
+      - ./monitoring/postgres_exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    environment:
+      - DATA_SOURCE_URI=db_edge1:5432/edge1_db?sslmode=disable
+      - DATA_SOURCE_USER=admin
+      - DATA_SOURCE_PASS=admin
+      - PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres_exporter/queries.yaml
+    depends_on:
+      - db_edge1
+    restart: unless-stopped
+
+  postgres_exporter_edge2:
+    image: prometheuscommunity/postgres-exporter:latest
+    volumes:
+      - ./monitoring/postgres_exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    environment:
+      - DATA_SOURCE_URI=db_edge2:5432/edge2_db?sslmode=disable
+      - DATA_SOURCE_USER=admin
+      - DATA_SOURCE_PASS=admin
+      - PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres_exporter/queries.yaml
+    depends_on:
+      - db_edge2
+    restart: unless-stopped
+
+  postgres_exporter_edge3:
+    image: prometheuscommunity/postgres-exporter:latest
+    volumes:
+      - ./monitoring/postgres_exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    environment:
+      - DATA_SOURCE_URI=db_edge3:5432/edge3_db?sslmode=disable
+      - DATA_SOURCE_USER=admin
+      - DATA_SOURCE_PASS=admin
+      - PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres_exporter/queries.yaml
+    depends_on:
+      - db_edge3
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - postgres_exporter_core
+      - postgres_exporter_edge1
+      - postgres_exporter_edge2
+      - postgres_exporter_edge3
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3010:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  pgadmin_data:
+  cloudbeaver_data:
+  core_data:
+  core_replica_data:
+  edge1_data:
+  edge2_data:
+  edge3_data:
+  prometheus_data:
+  grafana_data:
