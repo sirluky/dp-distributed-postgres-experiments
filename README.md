@@ -68,4 +68,4 @@ make monitoring-up
 ```
 
 *Výchozí login do Grafany:* `admin` / `admin`
-*V Grafaně doporučuji naimportovat PostgreSQL komunitní dashboard s ID `9628`.*
+
